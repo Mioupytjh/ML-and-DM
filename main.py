@@ -1,42 +1,99 @@
 import numpy as np
 import pandas as pd
-import importlib_resources
-import xlrd
+import os
+from sklearn.decomposition import PCA
+import numpy.linalg as la
+import matplotlib.pyplot as plt
 
-filename = importlib_resources.files("DiamondData").joinpath("data/DiamondData.xls")
-print("\nLocation of the iris.xls file: {}".format(filename))
+data: pd.DataFrame = pd.read_csv("data/diamond.csv")
 
-doc = xlrd.open_workbook(filename).sheet_by_index(0)
+Data = data.copy()
 
-# Extract data from the first column, including the header
-raw_values = doc.col_values(0)  # Includes header row
+# Check for null values in the data set
+null_count = Data.isnull().sum().sum()
+print(f"Count null values in the data set: {null_count}")
 
-spread_data = [row.split(',') for row in raw_values]
+# One-out-of K encoding
+Data = pd.get_dummies(Data)
 
-df = pd.DataFrame(spread_data)
 
-for i in range(10):
-    doc.put_cell(0, i, xlrd.XL_CELL_TEXT, f'Feature_{i+1}', 0)  # Set new headers from the split values
-    for j, value in enumerate(df.iloc[:, i]):
-        doc.put_cell(j, i, xlrd.XL_CELL_TEXT, value, 0)
+# Normalizing / Centering the data
+Normalized_data = (Data - Data.mean()) / Data.std()
+# print(Normalized_data)
 
-attributeNames = doc.row_values(rowx=0, start_colx=0, end_colx=9)
+# Perform PCA using sklearn
+pca = PCA(n_components=2)  # Example: reduce to 2 components
+principalComponents = pca.fit_transform(Normalized_data)
 
-classLabels = doc.col_values(0, 1, 53941)  # check out help(doc.col_values)
-classNames = sorted(set(classLabels))
-classDict = dict(zip(classNames, range(len(classNames))))
+# print(data)
+def plot_data(attribute):
+    global data
+    global principalComponents
+    
+    # Saves the color value of each data point
+    label = data[attribute]
 
-# Extract vector y, convert to NumPy array
-y = np.array([classDict[value] for value in classLabels])
+    # Create a DataFrame with the principal components
+    principalDf = pd.DataFrame(data=principalComponents, columns=['principal component 1', 'principal component 2'])
 
-# Preallocate memory, then extract data to matrix X
-X = np.empty((classLabels, 9))
-for i in range(9):
-    X[:, i] = np.array(doc.col_values(i, 1, 151)).T
+    principalDf[attribute] = label
 
-# Compute values of N, M and C.
-N = len(y) #Number of observations
-M = len(attributeNames) - 1 #Number of features (excluding the class label)
-C = len(classNames) #number of classes
+    unique_colors = principalDf[attribute].unique()
+    color_map = {color: idx for idx, color in enumerate(unique_colors)}
 
-print(X.shape)
+    colors = principalDf[attribute].map(color_map)
+
+    print(principalDf)
+
+
+    plt.figure(figsize=(10, 7))
+
+    components = pca.components_
+    feature_names = pca.feature_names_in_  # Original feature names
+
+    # Scale for better visualization
+    scaling_factor = 5  # Adjust for better visualization on the plot
+    
+    scatter = plt.scatter(
+        principalDf['principal component 1'],
+        principalDf['principal component 2'],
+        c=colors, cmap='tab10', alpha=0.6
+    )
+    legend_handles = [plt.Line2D([0], [0], marker='o', color='w', label=color,
+                                markerfacecolor=plt.cm.tab10(idx / len(unique_colors)), markersize=8)
+                    for color, idx in color_map.items()]
+
+    plt.legend(handles=legend_handles, title=f"Diamond {attribute.title()}")
+    plt.title('PCA Plot of Diamond Dataset')
+    plt.xlabel('principal component 1')
+    plt.ylabel('principal component 2')
+    plt.grid(True)
+    for component in components.T[:2]:
+        plt.arrow(
+            0, 0,  # Starting point of the arrow (origin)
+            component[0] * scaling_factor,  # Scaled x-component
+            component[1] * scaling_factor,  # Scaled y-component
+            color='red', width=0.01, head_width=0.15, alpha=0.8
+        )
+
+    plt.show()
+
+plot_data("color")
+plot_data("clarity")
+plot_data("cut")
+
+pca = PCA()  # Example: reduce to 2 components
+principalComponents = pca.fit_transform(Normalized_data)
+
+vals = pca.explained_variance_ratio_
+vals_acc = np.add.accumulate(vals) # y
+vals_num = np.arange(1, pca.explained_variance_.shape[0] + 1)  # Number of components
+
+plt.figure(figsize=(12, 7))
+plt.plot(vals_num, vals_acc, marker='o', linestyle='-', color='b', label='Cumulative Explained Variance')
+plt.title('Explained Variance as a Function of Number of PCA Components')
+plt.xlabel('Number of Principal Components')
+plt.ylabel('Explained Variance Ratio')
+plt.legend()
+plt.grid(True)
+plt.show()
