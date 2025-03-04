@@ -1,4 +1,4 @@
-cut,color,clarity,carat,depth,table,price,x (Premium),z (Very Good),y (Good)
+cut,color,clarity,carat,depth,table,price,x,z,y
 Fair,E,VS2,0.22,65.1,61,337,3.87,2.49,3.78
 Fair,E,SI2,0.86,55.1,69,2757,6.45,3.52,6.33
 Fair,F,SI2,0.96,66.3,62,2759,6.27,04.07,5.95
